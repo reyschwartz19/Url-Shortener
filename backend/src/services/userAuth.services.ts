@@ -2,7 +2,7 @@ import prisma from "../config/prisma";
 import bcrypt from "bcrypt";
 import { ConflictError, UnauthorizedError, ValidationError } from "../errors/AppError";
 import { RegisterInput, LoginInput } from "../types/auth.types";
-import { revokeRefreshToken, saveRefreshToken, signAccessToken } from "./tokenService";
+import { revokeRefreshToken, rotateRefreshToken, saveRefreshToken, signAccessToken } from "./tokenService";
 
 
 const SALT_ROUNDS = 10;
@@ -63,3 +63,4 @@ export const loginUser = async (input: LoginInput) => {
 export const logoutUser = async (UserId: string, refreshToken: string) => {
    await revokeRefreshToken(UserId, refreshToken);
 }
+

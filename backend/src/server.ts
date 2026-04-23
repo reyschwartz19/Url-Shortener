@@ -1,12 +1,16 @@
 import express  from "express";
 import "dotenv/config"
 import cors from "cors";
+import cookieParser from "cookie-parser";
+import authRouter from "./routes/auth.route";
+import { errorHandler } from "./middleware/errorHandler";
+import { ENV } from "./config/env";
 
 
 
 const app = express();
 
-const port = process.env.PORT;
+const port = ENV.PORT;
 
 app.use(cors(
     {
@@ -19,6 +23,12 @@ app.use(cors(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+app.use("/api/auth", authRouter)
+
+
+app.use(errorHandler);
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

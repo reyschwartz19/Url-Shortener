@@ -23,8 +23,8 @@ export const verifyAccessToken = (token: string) => {
     }
 }
 
-export const signRefreshToken = (userId: string, token: string) => {
-    return jwt.sign({userId, token}, REFRESH_SECRET, {expiresIn: REFRESH_TOKEN_EXP})
+export const signRefreshToken = (userId: string) => {
+    return jwt.sign({userId}, REFRESH_SECRET, {expiresIn: REFRESH_TOKEN_EXP})
 }
 
 export const saveRefreshToken = async(userId: string, token: string) => {
@@ -36,7 +36,7 @@ export const saveRefreshToken = async(userId: string, token: string) => {
     })
 }
 
-export const rotateRefreshToken = async(userId: string, oldToken: string) => {
+export const rotateRefreshToken = async( oldToken: string) => {
     const payload = jwt.decode(oldToken) as {userId: string};
     if (!payload) {
         throw new UnauthorizedError("Invalid refresh token");
@@ -79,10 +79,10 @@ export const rotateRefreshToken = async(userId: string, oldToken: string) => {
     })
 
     const newAccessToken = signAccessToken(payload.userId);
-    const newRefreshToken = signRefreshToken(payload.userId, newAccessToken);
-    await saveRefreshToken(payload.userId, newAccessToken);
+    const newRefreshToken = signRefreshToken(payload.userId);
+    await saveRefreshToken(payload.userId, newRefreshToken);
 
-    return { accessToken: newAccessToken, refreshAccessToken: newRefreshToken };
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }
 
 export const revokeRefreshToken = async (userId: string, token: string) => {

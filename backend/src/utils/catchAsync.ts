@@ -7,7 +7,7 @@ type AsyncController = (
 ) => Promise<void>
 
 export const catchAsync = (fn: AsyncController) =>{
-    (req: Request, res:Response, next: NextFunction) =>{
+    return (req: Request, res:Response, next: NextFunction) =>{
         fn(req,res,next).catch(next)
     }
 }
