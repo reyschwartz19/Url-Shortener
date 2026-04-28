@@ -8,7 +8,14 @@ import { rotateRefreshToken } from "../services/tokenService";
 export const registerController = catchAsync(async (req: Request, res: Response) => {
     const input = registerSchema.parse(req.body);
     const user = await registerUser(input);
-    res.status(201).json(user);
+    const {accessToken, refreshToken} = await loginUser(input)
+     res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,   // JS cannot access this
+    secure: true,     // HTTPS only
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+  });
+    res.status(201).json({user,  accessToken});
 });
 
 export const loginController = catchAsync(async (req: Request, res: Response) => {
