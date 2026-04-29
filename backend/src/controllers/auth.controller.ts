@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
-import { loginUser, registerUser, logoutUser } from "../services/userAuth.services";
-import { registerSchema } from "../config/inputValidator";
+import { loginUser, registerUser, logoutUser } from "../services/userAuth.service";
+import { registerSchema } from "../schema/authInput.schema";
 import { UnauthorizedError } from "../errors/AppError";
-import { rotateRefreshToken } from "../services/tokenService";
+import { rotateRefreshToken } from "../services/token.service";
 
 export const registerController = catchAsync(async (req: Request, res: Response) => {
     const input = registerSchema.parse(req.body);

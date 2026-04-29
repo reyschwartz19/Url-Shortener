@@ -3,6 +3,7 @@ import "dotenv/config"
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.route";
+import linkRouter from "./routes/link.route";
 import { errorHandler } from "./middleware/errorHandler";
 import { ENV } from "./config/env";
 
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter)
+app.use("/api/links", linkRouter)
 
 
 app.use(errorHandler);
