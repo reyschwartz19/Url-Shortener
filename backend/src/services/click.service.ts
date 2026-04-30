@@ -19,7 +19,7 @@ export const recordClick = async(linkId: string, req: Request) => {
 }
 
 export const getTotalClicks = async (linkId: string) => {
-    const count = prisma.click.count({
+    const count = await prisma.click.count({
         where: {linkId}
     });
     
