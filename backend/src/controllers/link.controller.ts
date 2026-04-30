@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { createShortLink, deleteLink, getLinkByShortCode, getUserLinks } from "../services/links.service";
 import { createLinkSchema } from "../schema/link.schema";
+import { recordClick } from "../services/click.service";
 
 export const createLinkController = catchAsync(async(req: Request, res: Response) => {
     const userId = req.user!.userId;
@@ -31,6 +32,8 @@ export const redirectLinkController = catchAsync(async (req: Request, res: Respo
          res.status(404).json({ message: "Link not found" });
          return;
     }
+
+    recordClick(link.linkId, req).catch(console.error);
 
     res.redirect(301,link.originalUrl);
 });

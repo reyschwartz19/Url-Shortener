@@ -3,6 +3,7 @@ import { ConflictError, UnauthorizedError, ValidationError, NotFoundError } from
 import { CreateLinkInput } from "../types/link.types";
 import { nanoid } from "nanoid";
 
+
 export const createShortLink = async (
     input: CreateLinkInput,
     userId: string
@@ -41,6 +42,12 @@ export const getLinkByShortCode = async (shortCode: string) => {
         where: { shortCode },
     });
 };
+
+export const getLinkById = async (linkId: string) => {
+    return await prisma.link.findUnique({
+        where: { linkId },
+    });
+}
 
 export const deleteLink= async (linkId: string, userId: string) => {
     const link = await prisma.link.findUnique({

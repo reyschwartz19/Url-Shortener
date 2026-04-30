@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.route";
 import linkRouter from "./routes/link.route";
+import clickRouter from "./routes/click.route";
 import { errorHandler } from "./middleware/errorHandler";
 import { ENV } from "./config/env";
 
@@ -28,7 +29,7 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRouter)
 app.use("/api/links", linkRouter)
-
+app.use("/api/clicks", clickRouter)
 
 app.use(errorHandler);
 
