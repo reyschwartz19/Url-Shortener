@@ -7,8 +7,12 @@ export const createLinkController = catchAsync(async(req: Request, res: Response
     const userId = req.user!.userId;
     const input = createLinkSchema.parse(req.body);
     const link = await createShortLink(input, userId);
-    res.status(201).json(link);
-})
+    res.status(201).json({
+        linkId: link.linkId,
+        shortCode: link.shortCode,
+        originalUrl: link.originalUrl
+    });
+});
 
 export const deleteLinkController = catchAsync(async (req: Request, res: Response) => {
   const  linkId  = req.params.linkId as string;
@@ -22,8 +26,8 @@ export const deleteLinkController = catchAsync(async (req: Request, res: Respons
 export const redirectLinkController = catchAsync(async (req: Request, res: Response) => {
     const shortCode  = req.params.shortCode as string;
     const link = await getLinkByShortCode(shortCode);
-
-    if (!link || link.deletedAt === null) {
+    console.log("Link found:", link);
+    if (!link || link.deletedAt) {
          res.status(404).json({ message: "Link not found" });
          return;
     }

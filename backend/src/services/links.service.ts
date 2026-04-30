@@ -47,7 +47,7 @@ export const deleteLink= async (linkId: string, userId: string) => {
         where: { linkId },
     });
 
-    if(!link || link.deletedAt === null){
+    if(!link || link.deletedAt){
         throw new NotFoundError("Link not found");
     }
 
