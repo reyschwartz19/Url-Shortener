@@ -431,14 +431,13 @@ Validation schemas are located in [backend/src/schema/](backend/src/schema/)
 - [ ] Implement rate limiting
 - [ ] Add caching layer (Redis)
 - [ ] QR code generation for short links
-- [ ] Custom short codes
 - [ ] Link expiration
 - [ ] Bulk operations API
 - [ ] Admin dashboard
 - [ ] Analytics visualizations
 - [ ] Email verification
 - [ ] Password reset flow
-- [ ] Social authentication (OAuth)
+
 
 ## Troubleshooting
 
