@@ -1,0 +1,33 @@
+services:
+ urlshortener-db:
+  image: postgres:15
+  ports:
+   - 5433:5432
+  environment:
+    POSTGRES_USER: username123
+    POSTGRES_PASSWORD: password123
+    POSTGRES_DB: url_shortener
+  volumes:
+    - urlShortener-data:/var/lib/postgresql/data
+  restart: unless-stopped
+ adminer:
+  image: adminer:latest
+  restart: unless-stopped
+  ports:
+   - 8080:8080
+  depends_on:
+   - urlshortener-db   
+
+
+ url-shortener-backend:
+  build: ./backend
+  ports:
+   - 3000:3000
+  env_file:
+    - ./backend/.env
+  depends_on:
+   - urlshortener-db
+  restart: unless-stopped
+
+volumes:
+ urlShortener-data:
