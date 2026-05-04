@@ -1,5 +1,6 @@
 import prisma from "../config/prisma";
 import { ConflictError, UnauthorizedError, ValidationError, NotFoundError } from "../errors/AppError";
+import { isSafeUrl } from "../schema/link.schema";
 import { CreateLinkInput } from "../types/link.types";
 import { nanoid } from "nanoid";
 
@@ -12,6 +13,10 @@ export const createShortLink = async (
 
     if (!originalUrl) {
         throw new ValidationError("Original URL is required");
+    }
+
+    if(!isSafeUrl(originalUrl)){
+        throw new ValidationError("URL is not allowed");
     }
 
     const MAX_RETRIES = 5;
