@@ -7,6 +7,7 @@ import linkRouter from "./routes/link.route";
 import clickRouter from "./routes/click.route";
 import { errorHandler } from "./middleware/errorHandler";
 import { ENV } from "./config/env";
+import { redis } from "./config/redis";
 
 
 
@@ -33,6 +34,12 @@ app.use("/api/clicks", clickRouter)
 
 app.use(errorHandler);
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-})
+async function start() {
+    await redis.connect();
+    app.listen(port, () => {
+        console.log(`Server is running on port ${port}`);
+    })
+    
+}
+
+start();

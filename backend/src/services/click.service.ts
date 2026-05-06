@@ -2,26 +2,38 @@ import prisma from "../config/prisma";
 import bcrypt from "bcrypt";
 import geoip from "geoip-lite";
 import { Request } from "express";
+import { redis } from "../config/redis";
 
-export const recordClick = async(linkId: string, req: Request) => {
+export const recordClick = async(linkId: string, req: Request, shortCode: string) => {
     const ip = req.ip ?? req.socket.remoteAddress ?? null;
     const geo = ip ? geoip.lookup(ip) : null;
     const country = geo?.country ?? null
 
     const ipHash = ip ? await bcrypt.hash(ip,5): null
-    await prisma.click.create({
-        data: {
-            linkId,
-            country,
-            ipHash
-        }
-    })
+    
+    await Promise.all([
+    prisma.click.create({ data: { linkId, country, ipHash } }),
+    redis.hincrby(`meta:${shortCode}`, "clicks", 1),
+  ]);
+
 }
 
-export const getTotalClicks = async (linkId: string) => {
+export const getTotalClicks = async (linkId: string, shortCode?: string) => {
+
+    if(shortCode){
+        const cached = await redis.hget(`meta:${shortCode}`, "clicks");
+        if(cached !== null){
+            return { totalCount: parseInt(cached) };
+        }
+    }
+
     const count = await prisma.click.count({
         where: {linkId}
     });
+
+     if (shortCode) {
+    await redis.hset(`meta:${shortCode}`, "clicks", String(count));
+  }
     
     return {totalCount: count}
 }

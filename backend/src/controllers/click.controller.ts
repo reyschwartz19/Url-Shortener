@@ -13,7 +13,7 @@ export const getStatsController = catchAsync(async (req: Request, res: Response)
         throw new ForbiddenError("Access denied");
     }
     const [totalClicks, clicksByCountry, clicksOverTime] = await Promise.all([
-        getTotalClicks(linkId),
+        getTotalClicks(linkId, link!.shortCode),
         getClicksByCountry(linkId),
         getClicksOverTime(linkId)
     ]);

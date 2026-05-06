@@ -33,7 +33,7 @@ export const redirectLinkController = catchAsync(async (req: Request, res: Respo
          return;
     }
 
-    recordClick(link.linkId, req).catch(console.error);
+    recordClick(link.linkId, req, link.shortCode).catch(console.error);
 
     res.redirect(301,link.originalUrl);
 });
