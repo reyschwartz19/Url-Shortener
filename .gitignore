@@ -38,3 +38,5 @@ build/
 
 # System files
 Thumbs.db
+
+certs/

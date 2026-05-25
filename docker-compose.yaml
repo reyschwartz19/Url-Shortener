@@ -11,6 +11,20 @@ services:
     - urlShortener-data:/var/lib/postgresql/data
   restart: unless-stopped
 
+ nginx:
+  image: nginx:alpine
+  ports:
+    - 80:80
+    - 443:443
+  volumes:
+    - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./certs:/etc/nginx/certs:ro
+  depends_on:
+    - url-shortener-backend
+    - url-shortener-backend2
+    - url-shortener-backend3
+    
+
  redis:
   image: redis:latest
   ports:
@@ -23,7 +37,7 @@ services:
   image: adminer:latest
   restart: unless-stopped
   ports:
-   - 8080:8080
+   - 8081:8080
   depends_on:
    - urlshortener-db   
 
@@ -31,16 +45,44 @@ services:
  url-shortener-backend:
   build: ./backend
   ports:
-   - 3000:3000
+   - 3004:3000
   env_file:
     - ./backend/.env
   environment:
     REDIS_URL: redis://redis:6379
+    APP_NAME: app1
   depends_on:
    - urlshortener-db
    - redis
   restart: unless-stopped
 
+ url-shortener-backend2:
+  build: ./backend
+  ports:
+   - 3002:3000
+  env_file:
+    - ./backend/.env
+  environment:
+    REDIS_URL: redis://redis:6379
+    APP_NAME: app2
+  depends_on:
+   - urlshortener-db
+   - redis
+  restart: unless-stopped
+
+ url-shortener-backend3:
+  build: ./backend
+  ports:
+   - 3003:3000
+  env_file:
+    - ./backend/.env
+  environment:
+    REDIS_URL: redis://redis:6379
+    APP_NAME: app3
+  depends_on:
+   - urlshortener-db
+   - redis
+  restart: unless-stopped
 volumes:
  urlShortener-data:
  redis-data:

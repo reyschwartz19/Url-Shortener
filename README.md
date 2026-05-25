@@ -21,12 +21,13 @@ A full-stack URL shortening service built with TypeScript, Express, PostgreSQL, 
 - **Language**: TypeScript
 - **Framework**: Express.js 5.x
 - **Database**: PostgreSQL 15
-- **ORM**: Prisma 7.x
+- **ORM**: Prisma 7.x (with PostgreSQL adapter)
+- **Caching**: Redis 7.x
 - **Authentication**: JWT (jsonwebtoken)
 - **Validation**: Zod
 - **Password Hashing**: bcrypt
 - **Geolocation**: geoip-lite
-- **Utilities**: nanoid (for short code generation), cookie-parser
+- **Utilities**: nanoid (for short code generation), cookie-parser, ioredis
 
 ### DevTools
 - **Dev Server**: ts-node-dev
@@ -36,7 +37,9 @@ A full-stack URL shortening service built with TypeScript, Express, PostgreSQL, 
 ### Infrastructure
 - **Containerization**: Docker
 - **Orchestration**: Docker Compose
+- **Load Balancing**: Nginx (Reverse proxy)
 - **Database Admin UI**: Adminer (for local development)
+- **Multiple Deployment**: 3 backend instances with load balancing
 
 ## Prerequisites
 
@@ -94,8 +97,13 @@ A full-stack URL shortening service built with TypeScript, Express, PostgreSQL, 
 
    This starts:
    - **PostgreSQL** (port 5433): Main database
-   - **Adminer** (port 8080): Database management UI
-   - **Backend API** (port 3000): Express server
+   - **Redis** (port 6379): Caching layer
+   - **Nginx** (ports 80, 443): Reverse proxy and load balancer
+   - **Backend Instances** (3 instances):
+     - `url-shortener-backend` (port 3004, internal 3000)
+     - `url-shortener-backend2` (port 3002, internal 3000)
+     - `url-shortener-backend3` (port 3003, internal 3000)
+   - **Adminer** (port 8081): Database management UI
 
 2. **Verify Services**
    ```bash
@@ -121,6 +129,7 @@ A full-stack URL shortening service built with TypeScript, Express, PostgreSQL, 
 | `DATABASE_URL` | string | Yes | PostgreSQL connection string |
 | `JWT_SECRET` | string | Yes | Secret for signing access tokens (min 10 chars) |
 | `JWT_REFRESH_SECRET` | string | Yes | Secret for signing refresh tokens (min 10 chars) |
+| `REDIS_URL` | string | No | Redis connection URL (e.g., `redis://redis:6379`). Auto-set in Docker. |
 
 ## API Endpoints
 
@@ -263,7 +272,8 @@ urlShortener/
 │   │   ├── server.ts              # Express app entry point
 │   │   ├── config/
 │   │   │   ├── env.ts             # Environment validation (Zod)
-│   │   │   └── prisma.ts          # Prisma client instance
+│   │   │   ├── prisma.ts          # Prisma client instance
+│   │   │   └── redis.ts           # Redis client configuration
 │   │   ├── controllers/           # Request handlers
 │   │   │   ├── auth.controller.ts
 │   │   │   ├── link.controller.ts
@@ -301,7 +311,10 @@ urlShortener/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── prisma.config.ts
-├── docker-compose.yaml            # Multi-container setup
+├── nginx/
+│   └── nginx.conf                 # Nginx reverse proxy & load balancer config
+├── certs/                         # SSL/TLS certificates
+├── docker-compose.yaml            # Multi-container orchestration (3 backend instances + load balancing)
 └── README.md                       # This file
 ```
 
@@ -369,17 +382,59 @@ npx prisma generate
   - Password: `password123`
 - **Database**: `url_shortener`
 - **Volume**: `urlShortener-data` (persists between restarts)
+- **Restart Policy**: unless-stopped
+
+### redis
+- **Image**: redis:latest
+- **Port**: 6379
+- **Purpose**: Caching layer for session and data storage
+- **Volume**: `redis-data` (persists between restarts)
+- **Features**: AOF (Append-Only File) persistence enabled
+- **Restart Policy**: unless-stopped
+
+### nginx
+- **Image**: nginx:alpine
+- **Ports**: 80 (HTTP), 443 (HTTPS)
+- **Purpose**: Reverse proxy and load balancer
+- **Configuration**: [nginx/nginx.conf](nginx/nginx.conf)
+- **SSL/TLS Certificates**: Located in `./certs/` directory
+- **Routes To**: All 3 backend instances with load balancing
 
 ### adminer
 - **Image**: adminer:latest
-- **Port**: 8080
+- **Port**: 8081
 - **Purpose**: Web-based database management UI
-- **Access**: `http://localhost:8080`
+- **Access**: `http://localhost:8081`
+- **Restart Policy**: unless-stopped
 
-### url-shortener-backend
+### url-shortener-backend (Instance 1)
 - **Build**: `./backend/Dockerfile`
-- **Port**: 3000
-- **Dependencies**: Waits for database to be ready via entrypoint.sh
+- **Port**: 3004 (external) → 3000 (internal)
+- **Environment**: 
+  - `REDIS_URL`: redis://redis:6379
+  - `APP_NAME`: app1
+- **Dependencies**: Database, Redis
+- **Restart Policy**: unless-stopped
+
+### url-shortener-backend2 (Instance 2)
+- **Build**: `./backend/Dockerfile`
+- **Port**: 3002 (external) → 3000 (internal)
+- **Environment**: 
+  - `REDIS_URL`: redis://redis:6379
+  - `APP_NAME`: app2
+- **Dependencies**: Database, Redis, Nginx
+- **Restart Policy**: unless-stopped
+
+### url-shortener-backend3 (Instance 3)
+- **Build**: `./backend/Dockerfile`
+- **Port**: 3003 (external) → 3000 (internal)
+- **Environment**: 
+  - `REDIS_URL`: redis://redis:6379
+  - `APP_NAME`: app3
+- **Dependencies**: Database, Redis, Nginx
+- **Restart Policy**: unless-stopped
+
+**Load Balancing**: Nginx distributes incoming requests across all 3 backend instances for high availability and scalability.
 
 ## Error Handling
 
@@ -399,13 +454,42 @@ Custom error types are defined in [AppError.ts](backend/src/errors/AppError.ts).
 
 ## CORS Configuration
 
-The backend is configured to accept requests from:
-- **Frontend**: `http://localhost:5173` (default Vite dev server)
+The backend is configured to accept requests with:
 - **Methods**: GET, POST, PUT, DELETE
 - **Headers**: Content-Type, Authorization
 - **Credentials**: Enabled
 
-Update the CORS origin in [server.ts](backend/src/server.ts) for production deployments.
+When using Docker with Nginx:
+- Requests are routed through Nginx on ports 80 (HTTP) and 443 (HTTPS)
+- Update the CORS origin in [server.ts](backend/src/server.ts) to match your frontend domain
+- For local development, Nginx is configured to proxy requests to all 3 backend instances
+
+## Load Balancing Architecture
+
+The application uses a **3-tier load-balanced deployment**:
+
+```
+Client Requests
+       ↓
+   [Nginx] (Reverse Proxy & Load Balancer)
+   ↙    ↓    ↘
+Backend1  Backend2  Backend3
+   ↖    ↓    ↙
+   [PostgreSQL DB] ← Shared Database
+   [Redis] ← Shared Cache
+```
+
+**Benefits**:
+- **High Availability**: If one backend fails, traffic routes to others
+- **Scalability**: Add more backend instances easily
+- **Performance**: Requests distributed across multiple instances
+- **Caching**: Redis shared cache for all instances
+- **Session Consistency**: Database-backed sessions work across instances
+
+**Nginx Configuration**:
+- Load balancing algorithm: Round-robin (default)
+- Health checks: Can be configured in [nginx/nginx.conf](nginx/nginx.conf)
+- SSL/TLS termination: Handled by Nginx
 
 ## Input Validation
 
@@ -414,6 +498,20 @@ All API inputs are validated using Zod schemas:
 - **Link Schemas**: URL format validation
 
 Validation schemas are located in [backend/src/schema/](backend/src/schema/)
+
+## Caching with Redis
+
+Redis is integrated for:
+- **Session Management**: Store session tokens and user data
+- **Rate Limiting**: Prevent abuse by tracking request counts
+- **Data Caching**: Cache frequently accessed links and analytics
+- **Distributed Cache**: Shared across all 3 backend instances
+
+**Configuration**: Set `REDIS_URL` environment variable (auto-configured in Docker)
+
+**Access**:
+- Local development: `redis://localhost:6379`
+- Docker: `redis://redis:6379`
 
 ## Security Features
 
@@ -428,8 +526,7 @@ Validation schemas are located in [backend/src/schema/](backend/src/schema/)
 ## TODO / Future Enhancements
 
 - [ ] Add comprehensive test suite (Jest/Mocha)
-- [ ] Implement rate limiting
-- [ ] Add caching layer (Redis)
+- [ ] Implement advanced rate limiting with Redis
 - [ ] QR code generation for short links
 - [ ] Link expiration
 - [ ] Bulk operations API
@@ -437,6 +534,8 @@ Validation schemas are located in [backend/src/schema/](backend/src/schema/)
 - [ ] Analytics visualizations
 - [ ] Email verification
 - [ ] Password reset flow
+- [ ] Monitoring and alerting (Prometheus, Grafana)
+- [ ] API documentation (Swagger/OpenAPI)
 
 
 ## Troubleshooting
@@ -445,6 +544,13 @@ Validation schemas are located in [backend/src/schema/](backend/src/schema/)
 - Verify `DATABASE_URL` is correct
 - Check PostgreSQL is running: `docker-compose ps`
 - Check port 5433 is not in use
+- Ensure Adminer can connect at `http://localhost:8081`
+
+### Redis Connection Issues
+- Verify Redis is running: `docker-compose ps`
+- Check port 6379 is available
+- Ensure `REDIS_URL` environment variable is set correctly
+- Check Redis logs: `docker-compose logs redis`
 
 ### Prisma Migration Fails
 ```bash
@@ -456,10 +562,27 @@ npx prisma migrate deploy
 ```
 
 ### Port Already in Use
-Change the port in `backend/.env` or `docker-compose.yaml`, or kill the process using the port.
+- Backend instances use ports 3002, 3003, 3004 (external mapping to 3000 internal)
+- Nginx uses ports 80 and 443
+- Redis uses port 6379
+- PostgreSQL uses port 5433
+- Adminer uses port 8081
+
+Change ports in `docker-compose.yaml` or kill the process using the port.
+
+### Load Balancer Issues (Nginx)
+- Verify Nginx is running: `docker-compose ps`
+- Check Nginx logs: `docker-compose logs nginx`
+- Verify backend instances are healthy: `docker-compose logs url-shortener-backend`
+- Check Nginx configuration: `docker exec -it nginx nginx -t`
 
 ### Container Won't Start
 Check logs: `docker-compose logs url-shortener-backend`
+
+### One Backend Instance Fails
+- The load balancer will route traffic to the remaining healthy instances
+- Check specific instance: `docker-compose logs url-shortener-backend2`
+- Restart a specific service: `docker-compose up -d url-shortener-backend2`
 
 ## License
 
