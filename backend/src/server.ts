@@ -38,6 +38,14 @@ app.get("/", (req: Request, res: Response) => {
     res.send(`Welcome to ${replicaApp} of the URL Shortener Service!`);
 })
 
+app.get('/health', (req: Request, res: Response) => {
+    res.status(200).json({
+        status: 'ok',
+        app: replicaApp,
+        timeStamp: new Date().toISOString()
+    });
+});
+
 app.use(errorHandler);
 
 async function start() {
