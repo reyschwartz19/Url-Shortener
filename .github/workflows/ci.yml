@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   ci:
@@ -54,6 +57,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     needs: ci
+    if: github.event_name == 'push'
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -73,7 +77,9 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: reyschwartz19/url-shortener-backend:latest
+          tags: | 
+            reyschwartz19/url-shortener-backend:latest
+            reyschwartz19/url-shortener-backend:${{ github.sha }}
    
       
 
