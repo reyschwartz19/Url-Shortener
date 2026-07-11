@@ -10,6 +10,11 @@ services:
   volumes:
     - urlShortener-data:/var/lib/postgresql/data
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U username123 -d url_shortener"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
 
  nginx:
   image: nginx:alpine
@@ -52,8 +57,8 @@ services:
     REDIS_URL: redis://redis:6379
     APP_NAME: app1
   depends_on:
-   - urlshortener-db
-   - redis
+   urlshortener-db:
+    condition: service_healthy
   restart: unless-stopped
 
  url-shortener-backend2:
@@ -66,8 +71,8 @@ services:
     REDIS_URL: redis://redis:6379
     APP_NAME: app2
   depends_on:
-   - urlshortener-db
-   - redis
+   urlshortener-db:
+    condition: service_healthy
   restart: unless-stopped
 
  url-shortener-backend3:
@@ -80,8 +85,8 @@ services:
     REDIS_URL: redis://redis:6379
     APP_NAME: app3
   depends_on:
-   - urlshortener-db
-   - redis
+   urlshortener-db:
+    condition: service_healthy
   restart: unless-stopped
 volumes:
  urlShortener-data:
