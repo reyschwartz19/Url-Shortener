@@ -4,6 +4,7 @@ import { loginUser, registerUser, logoutUser } from "../services/userAuth.servic
 import { registerSchema } from "../schema/authInput.schema";
 import { UnauthorizedError } from "../errors/AppError";
 import { rotateRefreshToken } from "../services/token.service";
+import { ENV } from "../config/env";
 
 export const registerController = catchAsync(async (req: Request, res: Response) => {
     const input = registerSchema.parse(req.body);
@@ -11,7 +12,7 @@ export const registerController = catchAsync(async (req: Request, res: Response)
     const {accessToken, refreshToken} = await loginUser(input)
      res.cookie("refreshToken", refreshToken, {
     httpOnly: true,   // JS cannot access this
-    secure: true,     // HTTPS only
+    secure: ENV.NODE_ENV === "production",     // HTTPS only in prod
     sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
   });
@@ -22,7 +23,7 @@ export const loginController = catchAsync(async (req: Request, res: Response) =>
     const { accessToken, refreshToken } = await loginUser(req.body);
     res.cookie("refreshToken", refreshToken, {
     httpOnly: true,   // JS cannot access this
-    secure: true,     // HTTPS only
+    secure: ENV.NODE_ENV === "production",     // HTTPS only in prod
     sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
   });
@@ -49,14 +50,14 @@ export const refreshController = catchAsync(async (req: Request, res: Response) 
 
   if (!refreshToken) throw new UnauthorizedError("No refresh token");
 
-  const { accessToken, refreshToken: newRefreshToken } = await rotateRefreshToken(refreshToken);
+  const { accessToken, refreshToken: newRefreshToken, email } = await rotateRefreshToken(refreshToken);
 
   res.cookie("refreshToken", newRefreshToken, {
     httpOnly: true,
-    secure: true,
+    secure: ENV.NODE_ENV === "production",
     sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-  res.json({ accessToken });
+  res.json({ accessToken, email });
 });

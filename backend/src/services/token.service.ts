@@ -82,7 +82,9 @@ export const rotateRefreshToken = async( oldToken: string) => {
     const newRefreshToken = signRefreshToken(payload.userId);
     await saveRefreshToken(payload.userId, newRefreshToken);
 
-    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+    const user = await prisma.user.findUnique({ where: { userId: payload.userId } });
+
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken, email: user?.email };
 }
 
 export const revokeRefreshToken = async (userId: string, token: string) => {

@@ -49,7 +49,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.use(errorHandler);
 
 async function start() {
-    await redis.connect();
+    // await redis.connect();
     app.listen(port, () => {
         console.log(`${replicaApp} is running on port ${port}`);
     })

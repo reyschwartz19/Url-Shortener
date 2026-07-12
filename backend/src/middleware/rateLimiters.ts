@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import type { Request } from 'express';
 import RedisStore, {RedisReply} from 'rate-limit-redis';
 import { redis } from "../config/redis";
@@ -25,7 +25,7 @@ const createLimiter = (options: {
         message: options.message,
         standardHeaders: true,
         legacyHeaders: false,
-        keyGenerator: options.keyGenerator ?? ((req) => req.ip ?? ''),
+        keyGenerator: options.keyGenerator ?? ((req) => ipKeyGenerator(req.ip ?? '')),
         store: new RedisStore({
             prefix: `rate-limit:${options.keyPrefix}`,
             sendCommand: (...args: string[]) => 
@@ -52,7 +52,7 @@ export const createLinkLimiter = createLimiter({
     windowMs: 60 * 60 * 1000,
     max: 30,
     keyPrefix: 'create-link',
-    keyGenerator: (req) => `user:${req.user?.id ?? req.ip}`,
+    keyGenerator: (req) => req.user?.id ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip ?? '')}`,
     message: 'Link creation limit exceeded. Please try again after 1 hour.',
 })
 

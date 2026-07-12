@@ -1,0 +1,6 @@
+{
+  "name": "Relay",
+  "description": "Enterprise-grade global link management infrastructure for real-time URL redirection, click tracking, and performance analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

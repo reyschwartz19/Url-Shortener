@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-primary: #D4AF37;
+  --color-primary-container: rgba(212, 175, 55, 0.12);
+  --color-on-primary: #050505;
+  --color-on-primary-container: #D4AF37;
+  
+  --color-secondary: #10b981;
+  --color-on-secondary: #050505;
+  
+  --color-background: #050505;
+  
+  --color-surface: #0a0a0a;
+  --color-surface-container: #121212;
+  --color-surface-container-low: #0c0c0c;
+  --color-surface-container-high: #1c1c1c;
+  --color-surface-container-highest: #262626;
+  
+  --color-outline: #666666;
+  --color-outline-variant: rgba(255, 255, 255, 0.1);
+  
+  --color-on-surface: #F5F5F5;
+  --color-on-surface-variant: #888888;
+}
+
+/* Base style setups */
+body {
+  background-color: #050505;
+  color: #F5F5F5;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Custom developer dashboard technical grid background */
+.noc-grid-bg {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px), 
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* Glass panel background */
+.glass-panel {
+  background: rgba(10, 10, 10, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Scanline animation for NOC dashboard */
+@keyframes scanning {
+  0% { transform: translateY(0); opacity: 0.1; }
+  50% { opacity: 0.3; }
+  100% { transform: translateY(100vh); opacity: 0.1; }
+}
+
+.animate-scanline {
+  animation: scanning 12s linear infinite;
+}
+
+/* SVG packet flow keyframes */
+@keyframes dashTravel {
+  from { stroke-dashoffset: 240; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes dashTravelReverse {
+  from { stroke-dashoffset: -200; }
+  to { stroke-dashoffset: 0; }
+}
+
+.animate-dash {
+  animation: dashTravel 8s linear infinite;
+}
+
+.animate-dash-reverse {
+  animation: dashTravelReverse 10s linear infinite;
+}
+
+/* Slower spin for globe overlays */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 20s linear infinite;
+}
+
+/* Entrance Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2a2a2a;
+}
