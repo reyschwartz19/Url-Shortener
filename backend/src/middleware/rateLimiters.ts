@@ -1,10 +1,10 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import type { Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import RedisStore, {RedisReply} from 'rate-limit-redis';
 import { redis } from "../config/redis";
 
 
-
+const isLoadTest = process.env.LOAD_TEST === "true";
 
 type RateLimitRequest = Request & {
     user?: {
@@ -56,14 +56,13 @@ export const createLinkLimiter = createLimiter({
     message: 'Link creation limit exceeded. Please try again after 1 hour.',
 })
 
-export const redirectIpLimiter = createLimiter({
-  windowMs: 60 * 1000,
-  max: 60,  // 1 request per second average per IP
-  keyPrefix: 'redirect-ip',
-  message: 'Slow down',
-})
+export const redirectIpLimiter = isLoadTest
+  ? (req: Request, res: Response, next: NextFunction) => next()
+  : createLimiter({ windowMs: 60 * 1000, max: 60, keyPrefix: "redirect-ip", message: "Slow down" });
 
-export const redirectCodeLimiter = createLimiter({
+export const redirectCodeLimiter = isLoadTest
+  ? (req: Request, res: Response, next: NextFunction) => next()
+  : createLimiter({
   windowMs: 60 * 1000,
   max: 200, // per specific short code — catches hotlink abuse
   keyPrefix: 'redirect-code',

@@ -8,6 +8,6 @@ const linkRouter = Router();
 linkRouter.post("/createLink", authenticateToken, createLinkController , createLinkLimiter);
 linkRouter.delete("/:linkId", authenticateToken, deleteLinkController);
 linkRouter.get("/userLinks", authenticateToken, getUserLinksController);
-linkRouter.get("/:shortCode", redirectLinkController, redirectCodeLimiter, redirectIpLimiter);
+linkRouter.get("/:shortCode",redirectIpLimiter,redirectCodeLimiter, redirectLinkController);
 
 export default linkRouter;
