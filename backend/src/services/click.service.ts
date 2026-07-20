@@ -3,18 +3,28 @@ import bcrypt from "bcrypt";
 import geoip from "geoip-lite";
 import { Request } from "express";
 import { redis } from "../config/redis";
+import crypto from "crypto";
 
 export const recordClick = async(linkId: string, req: Request, shortCode: string) => {
     const ip = req.ip ?? req.socket.remoteAddress ?? null;
     const geo = ip ? geoip.lookup(ip) : null;
     const country = geo?.country ?? null
 
-    const ipHash = ip ? await bcrypt.hash(ip,5): null
+    const ipHash = ip ?  crypto.createHash("sha256").update(ip).digest("hex"): null
     
+//     await Promise.all([
+//     prisma.click.create({ data: { linkId, country, ipHash } }),
+//     redis.hincrby(`meta:${shortCode}`, "clicks", 1),
+//   ]);
+
     await Promise.all([
-    prisma.click.create({ data: { linkId, country, ipHash } }),
-    redis.hincrby(`meta:${shortCode}`, "clicks", 1),
-  ]);
+        redis.rpush("click-buffer", JSON.stringify({
+            linkId,
+            country,
+            ipHash
+        })),
+        redis.hincrby(`meta:${shortCode}`, "clicks", 1),
+    ])
 
 }
 

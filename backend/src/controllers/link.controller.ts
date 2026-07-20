@@ -27,7 +27,7 @@ export const deleteLinkController = catchAsync(async (req: Request, res: Respons
 export const redirectLinkController = catchAsync(async (req: Request, res: Response) => {
     const shortCode  = req.params.shortCode as string;
     const link = await getLinkByShortCode(shortCode); 
-    console.log("Link found:", link);
+    // console.log("Link found:", link);
     if (!link || link.deletedAt) {
          res.status(404).json({ message: "Link not found" });
          return;

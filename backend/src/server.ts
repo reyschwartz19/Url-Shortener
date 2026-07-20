@@ -9,13 +9,14 @@ import { errorHandler } from "./middleware/errorHandler";
 import { ENV } from "./config/env";
 import { redis } from "./config/redis";
 import { Request, Response } from "express";
-
+import { startClickFlusher, stopClickFlusher } from "./workers/clickFlusher";
 
 
 const app = express();
 
 const port = ENV.PORT;
 const replicaApp = process.env.APP_NAME ;
+const flusherHandle = startClickFlusher();
 
 app.use(cors(
     {
@@ -57,3 +58,15 @@ async function start() {
 }
 
 start();
+
+process.on("SIGTERM", async () => {
+    console.log(`${replicaApp} shutting down, flushing remaining clicks...`);
+    await stopClickFlusher(flusherHandle);
+    process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+    console.log(`${replicaApp} shutting down, flushing remaining clicks...`);
+    await stopClickFlusher(flusherHandle);
+    process.exit(0);
+});

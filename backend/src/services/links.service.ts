@@ -44,7 +44,7 @@ export const createShortLink = async (
                 },
             });
 
-            await redis.hset(`link:${shortCode}`,{
+            await redis.hset(`meta:${shortCode}`,{
                 originalUrl,
                 userId,
                 clicks: "0",
