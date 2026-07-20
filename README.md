@@ -1,69 +1,78 @@
 # URL Shortener
 
-A full-stack URL shortening service built with TypeScript, Express, PostgreSQL, and Prisma. Create shortened URLs, track clicks with geolocation data, and manage your links through a RESTful API with JWT authentication.
+A full-stack URL shortening service with a React dashboard, built on TypeScript, Express, PostgreSQL, Prisma, and Redis. Create shortened URLs, track clicks with geolocation analytics, and manage your links through an authenticated SPA backed by a load-balanced API.
 
 ## Features
 
-- **User Authentication**: Secure signup and login with JWT tokens (access + refresh tokens)
-- **URL Shortening**: Convert long URLs into unique, short codes
-- **Link Management**: Create, retrieve, and delete shortened links
-- **Click Tracking**: Monitor every click with geolocation data and IP information
-- **Analytics**: Get detailed statistics for each shortened link
-- **Session Management**: Secure session handling with token expiration and refresh
-- **Input Validation**: Zod schema validation for all API inputs
-- **Error Handling**: Centralized error handling with custom error types
-- **CORS Support**: Ready for frontend integration
+- **React Dashboard** — Landing page, auth flows, link management, and per-link analytics via a Vite-powered SPA
+- **User Authentication** — JWT access + refresh token flow with httpOnly cookie rotation and in-memory token storage (XSS-safe)
+- **URL Shortening** — Convert long URLs into unique 8-character short codes (nanoid) with collision-retry logic
+- **Link Management** — Create, list, and soft-delete shortened links with Redis cache invalidation
+- **Click Tracking** — Buffered click recording via Redis lists, flushed to PostgreSQL in batches by a background worker
+- **Analytics** — Total clicks (Redis-cached), clicks grouped by country, and clicks over time
+- **Redis-Backed Rate Limiting** — Tiered limiters for auth, token refresh, link creation, and redirect endpoints
+- **URL Safety Validation** — SSRF protection blocking `localhost`, private IP ranges, and internal networks
+- **Session Management** — Database-backed sessions with bcrypt-hashed refresh tokens and token rotation
+- **Input Validation** — Zod schema validation for all API inputs
+- **Centralized Error Handling** — Custom `AppError` hierarchy (`ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, `UnauthorizedError`)
+- **CI/CD Pipeline** — GitHub Actions for build verification and Docker Hub image publishing
+- **Load-Balanced Deployment** — 3 backend instances behind Nginx with `least_conn` balancing
 
 ## Tech Stack
 
+### Frontend
+- **Framework**: React 19 with TypeScript
+- **Build Tool**: Vite 6
+- **Styling**: Tailwind CSS 4
+- **Data Fetching**: TanStack React Query 5 + Axios
+- **Animations**: Motion (Framer Motion)
+- **Icons**: Lucide React
+- **State Management**: In-memory auth token store with automatic refresh interceptor
+
 ### Backend
 - **Runtime**: Node.js (LTS Alpine)
-- **Language**: TypeScript
-- **Framework**: Express.js 5.x
+- **Language**: TypeScript 6
+- **Framework**: Express.js 5
 - **Database**: PostgreSQL 15
-- **ORM**: Prisma 7.x (with PostgreSQL adapter)
-- **Caching**: Redis 7.x
-- **Authentication**: JWT (jsonwebtoken)
-- **Validation**: Zod
-- **Password Hashing**: bcrypt
+- **ORM**: Prisma 7 (with PostgreSQL adapter)
+- **Caching & Buffering**: Redis 7 (ioredis)
+- **Authentication**: JWT (jsonwebtoken) + bcrypt
+- **Rate Limiting**: express-rate-limit + rate-limit-redis
+- **Validation**: Zod 4
 - **Geolocation**: geoip-lite
-- **Utilities**: nanoid (for short code generation), cookie-parser, ioredis
-
-### DevTools
-- **Dev Server**: ts-node-dev
-- **Testing**: (To be configured)
-- **Type Checking**: TypeScript 6.x
+- **Short Code Generation**: nanoid
 
 ### Infrastructure
-- **Containerization**: Docker
-- **Orchestration**: Docker Compose
-- **Load Balancing**: Nginx (Reverse proxy)
-- **Database Admin UI**: Adminer (for local development)
-- **Multiple Deployment**: 3 backend instances with load balancing
+- **Containerization**: Docker + Docker Compose
+- **Reverse Proxy / Load Balancer**: Nginx (least-conn, SSL termination)
+- **CI/CD**: GitHub Actions → Docker Hub
+- **Database Admin**: Adminer (local development)
+- **Deployment**: 3 backend replicas with health-checked database dependency
 
 ## Prerequisites
 
-- **Node.js** 18+ (LTS recommended)
+- **Node.js** 20+ (LTS recommended)
 - **Docker** & **Docker Compose** (for containerized setup)
 - **PostgreSQL** 15+ (or use Docker Compose)
-- **.env** configuration file with required environment variables
 
 ## Installation & Setup
 
 ### Local Development Setup
 
-1. **Clone and Navigate**
+1. **Clone the repository**
    ```bash
-   cd /home/rey/Projects/urlShortener
-   cd backend
+   git clone <repository-url>
+   cd urlShortener
    ```
 
-2. **Install Dependencies**
+2. **Backend setup**
    ```bash
+   cd backend
    npm install
    ```
 
-3. **Configure Environment Variables**
+3. **Configure environment variables**
+
    Create a `.env` file in the `backend/` directory:
    ```env
    NODE_ENV=development
@@ -73,49 +82,54 @@ A full-stack URL shortening service built with TypeScript, Express, PostgreSQL, 
    JWT_REFRESH_SECRET=your-secure-refresh-secret-min-10-chars
    ```
 
-4. **Set Up Database**
+4. **Set up the database**
    ```bash
-   # Run database migrations
    npx prisma migrate deploy
-   
-   # Generate Prisma Client
    npx prisma generate
    ```
 
-5. **Start Development Server**
+5. **Start the backend dev server**
    ```bash
    npm run dev
    ```
    Server runs on `http://localhost:3000`
 
+6. **Frontend setup** (in a new terminal)
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   Frontend runs on `http://localhost:3000` (proxied to backend via Vite)
+
 ### Docker Setup (Recommended)
 
-1. **Build and Start Services**
+1. **Build and start all services**
    ```bash
    docker-compose up -d
    ```
 
    This starts:
-   - **PostgreSQL** (port 5433): Main database
-   - **Redis** (port 6379): Caching layer
-   - **Nginx** (ports 80, 443): Reverse proxy and load balancer
-   - **Backend Instances** (3 instances):
-     - `url-shortener-backend` (port 3004, internal 3000)
-     - `url-shortener-backend2` (port 3002, internal 3000)
-     - `url-shortener-backend3` (port 3003, internal 3000)
-   - **Adminer** (port 8081): Database management UI
+   - **PostgreSQL** (port 5433) — Main database with health checks
+   - **Redis** (port 6379) — Caching, rate limiting, and click buffering
+   - **Nginx** (ports 80, 443) — Reverse proxy and `least_conn` load balancer
+   - **3 Backend Instances**:
+     - `url-shortener-backend` (port 3004 → internal 3000)
+     - `url-shortener-backend2` (port 3002 → internal 3000)
+     - `url-shortener-backend3` (port 3003 → internal 3000)
+   - **Adminer** (port 8081) — Database management UI
 
-2. **Verify Services**
+2. **Verify services**
    ```bash
    docker-compose ps
    ```
 
-3. **View Logs**
+3. **View logs**
    ```bash
    docker-compose logs -f url-shortener-backend
    ```
 
-4. **Stop Services**
+4. **Stop services**
    ```bash
    docker-compose down
    ```
@@ -129,11 +143,20 @@ A full-stack URL shortening service built with TypeScript, Express, PostgreSQL, 
 | `DATABASE_URL` | string | Yes | PostgreSQL connection string |
 | `JWT_SECRET` | string | Yes | Secret for signing access tokens (min 10 chars) |
 | `JWT_REFRESH_SECRET` | string | Yes | Secret for signing refresh tokens (min 10 chars) |
-| `REDIS_URL` | string | No | Redis connection URL (e.g., `redis://redis:6379`). Auto-set in Docker. |
+| `REDIS_URL` | string | No | Redis connection URL (auto-set in Docker: `redis://redis:6379`) |
+| `APP_NAME` | string | No | Replica identifier (e.g. `app1`, `app2`, `app3`) |
+| `LOAD_TEST` | boolean | No | Set to `"true"` to bypass redirect rate limiters during load testing |
 
 ## API Endpoints
 
 ### Authentication (`/api/auth`)
+
+| Method | Endpoint | Auth | Rate Limited | Description |
+|--------|----------|------|-------------|-------------|
+| `POST` | `/api/auth/register` | No | ✅ 10 req/15min | Register a new user |
+| `POST` | `/api/auth/login` | No | ✅ 10 req/15min | Login and receive tokens |
+| `POST` | `/api/auth/refresh` | Cookie | ✅ 20 req/15min | Rotate refresh token, get new access token |
+| `POST` | `/api/auth/logout` | Bearer | No | Revoke refresh token |
 
 #### Register
 ```http
@@ -145,7 +168,7 @@ Content-Type: application/json
   "password": "securePassword123"
 }
 ```
-**Response**: User ID, email, and tokens
+**Response**: `{ user: { id, email }, accessToken }` + httpOnly refresh token cookie
 
 #### Login
 ```http
@@ -157,23 +180,30 @@ Content-Type: application/json
   "password": "securePassword123"
 }
 ```
-**Response**: Access token, refresh token, user info
+**Response**: `{ accessToken }` + httpOnly refresh token cookie
 
 #### Refresh Token
 ```http
 POST /api/auth/refresh
-Authorization: Bearer <refresh-token>
+Cookie: refreshToken=<httpOnly-cookie>
 ```
-**Response**: New access token
+**Response**: `{ accessToken, email }` + rotated httpOnly refresh token cookie
 
 #### Logout
 ```http
 POST /api/auth/logout
 Authorization: Bearer <access-token>
 ```
-**Response**: Success confirmation
+**Response**: `{ message: "Logged out successfully" }`
 
 ### Links (`/api/links`)
+
+| Method | Endpoint | Auth | Rate Limited | Description |
+|--------|----------|------|-------------|-------------|
+| `POST` | `/api/links/createLink` | Bearer | ✅ 30 req/hr (per user) | Create a new short link |
+| `GET` | `/api/links/userLinks` | Bearer | No | Get all links for the authenticated user |
+| `GET` | `/api/links/:shortCode` | No | ✅ 60 req/min (IP) + 200 req/min (code) | Redirect to original URL |
+| `DELETE` | `/api/links/:linkId` | Bearer | No | Soft-delete a link |
 
 #### Create Short Link
 ```http
@@ -182,86 +212,84 @@ Authorization: Bearer <access-token>
 Content-Type: application/json
 
 {
-  "originalUrl": "https://very-long-url-example.com/path/to/resource"
+  "originalUrl": "https://example.com/very/long/path"
 }
 ```
-**Response**: Link object with `linkId`, `shortCode`, `originalUrl`, `createdAt`
+**Response**: `{ linkId, shortCode, originalUrl }`
 
-#### Get User's Links
-```http
-GET /api/links/userLinks
-Authorization: Bearer <access-token>
-```
-**Response**: Array of user's links
-
-#### Redirect to Original URL
+#### Redirect
 ```http
 GET /api/links/:shortCode
 ```
-**Response**: 302 redirect to original URL (records click data)
-
-#### Delete Link
-```http
-DELETE /api/links/:linkId
-Authorization: Bearer <access-token>
-```
-**Response**: Success confirmation
+**Response**: `302` redirect to original URL (records click asynchronously via Redis buffer)
 
 ### Click Analytics (`/api/clicks`)
 
-#### Get Link Statistics
-```http
-GET /api/clicks/:linkId/stats
-Authorization: Bearer <access-token>
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/clicks/:linkId/stats` | Bearer | Get click statistics for a link (owner only) |
+
+**Response**:
+```json
+{
+  "totalCount": 1250,
+  "clicksByCountry": [
+    { "country": "US", "count": 500 },
+    { "country": "GB", "count": 230 }
+  ],
+  "clicksOverTime": [
+    { "date": "2026-07-01", "count": 45 },
+    { "date": "2026-07-02", "count": 78 }
+  ]
+}
 ```
-**Response**: Click statistics including:
-- Total clicks
-- Clicks by country
-- Recent clicks with timestamps and geolocation data
+
+### Health Check
+
+```http
+GET /health
+```
+**Response**: `{ status: "ok", app: "app1", timeStamp: "..." }`
 
 ## Database Schema
 
 ### User
-```
-- userId (UUID, Primary Key)
-- email (String, Unique)
-- hashedPassword (String)
-- createdAt (DateTime)
-- links (One-to-Many relationship)
-- sessions (One-to-Many relationship)
-```
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `userId` | UUID | Primary Key, auto-generated |
+| `email` | String | Unique |
+| `hashedPassword` | String | bcrypt hash |
+| `createdAt` | DateTime | Default: now() |
 
 ### Link
-```
-- linkId (UUID, Primary Key)
-- userId (String, Foreign Key → User)
-- originalUrl (String)
-- shortCode (String, Unique)
-- createdAt (DateTime)
-- deletedAt (DateTime, nullable - soft delete)
-- user (Many-to-One relationship)
-- clicks (One-to-Many relationship)
-```
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `linkId` | UUID | Primary Key, auto-generated |
+| `userId` | String | FK → User, indexed |
+| `originalUrl` | String | — |
+| `shortCode` | String | Unique |
+| `createdAt` | DateTime | Default: now() |
+| `deletedAt` | DateTime? | Soft delete marker |
 
 ### Click
-```
-- id (UUID, Primary Key)
-- linkId (String, Foreign Key → Link)
-- clickedAt (DateTime)
-- country (String, nullable)
-- ipHash (String, nullable)
-- link (Many-to-One relationship)
-```
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | UUID | Primary Key, auto-generated |
+| `linkId` | String | FK → Link, indexed |
+| `clickedAt` | DateTime | Default: now() |
+| `country` | String? | ISO country code (geoip-lite) |
+| `ipHash` | String? | SHA-256 hash of visitor IP |
+
+**Indexes**: `[linkId]`, `[linkId, country]` (composite for analytics queries)
 
 ### Session
-```
-- sessionId (UUID, Primary Key)
-- userId (String, Foreign Key → User)
-- tokenHash (String, Unique)
-- createdAt (DateTime)
-- expiresAt (DateTime)
-- user (Many-to-One relationship)
-```
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `sessionId` | UUID | Primary Key, auto-generated |
+| `userId` | String | FK → User, indexed |
+| `tokenHash` | String | Unique, bcrypt hash of refresh token |
+| `createdAt` | DateTime | Default: now() |
+| `expiresAt` | DateTime | 7-day TTL |
 
 ## Project Structure
 
@@ -269,274 +297,245 @@ Authorization: Bearer <access-token>
 urlShortener/
 ├── backend/
 │   ├── src/
-│   │   ├── server.ts              # Express app entry point
+│   │   ├── server.ts                 # Express app entry point
 │   │   ├── config/
-│   │   │   ├── env.ts             # Environment validation (Zod)
-│   │   │   ├── prisma.ts          # Prisma client instance
-│   │   │   └── redis.ts           # Redis client configuration
-│   │   ├── controllers/           # Request handlers
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── link.controller.ts
-│   │   │   └── click.controller.ts
-│   │   ├── routes/                # API route definitions
-│   │   │   ├── auth.route.ts
-│   │   │   ├── link.route.ts
-│   │   │   └── click.route.ts
-│   │   ├── services/              # Business logic
-│   │   │   ├── userAuth.service.ts
-│   │   │   ├── links.service.ts
-│   │   │   ├── click.service.ts
-│   │   │   └── token.service.ts
+│   │   │   ├── env.ts                # Environment validation (Zod)
+│   │   │   ├── prisma.ts             # Prisma client singleton
+│   │   │   └── redis.ts              # ioredis client
+│   │   ├── controllers/
+│   │   │   ├── auth.controller.ts    # Register, login, refresh, logout
+│   │   │   ├── link.controller.ts    # CRUD + redirect
+│   │   │   └── click.controller.ts   # Analytics aggregation
+│   │   ├── routes/
+│   │   │   ├── auth.route.ts         # Auth routes + rate limiters
+│   │   │   ├── link.route.ts         # Link routes + rate limiters
+│   │   │   └── click.route.ts        # Stats routes
+│   │   ├── services/
+│   │   │   ├── userAuth.service.ts   # User registration & login
+│   │   │   ├── links.service.ts      # Link CRUD with Redis caching
+│   │   │   ├── click.service.ts      # Click recording & analytics
+│   │   │   └── token.service.ts      # JWT signing, refresh rotation
 │   │   ├── middleware/
-│   │   │   ├── auth.middleware.ts # JWT validation
-│   │   │   └── errorHandler.ts    # Global error handler
-│   │   ├── schema/                # Zod validation schemas
-│   │   │   ├── authInput.schema.ts
-│   │   │   └── link.schema.ts
-│   │   ├── types/                 # TypeScript type definitions
+│   │   │   ├── auth.middleware.ts     # JWT validation
+│   │   │   ├── errorHandler.ts       # Global error handler
+│   │   │   └── rateLimiters.ts       # Redis-backed rate limiters
+│   │   ├── workers/
+│   │   │   └── clickFlusher.ts       # Background click buffer → DB writer
+│   │   ├── scripts/
+│   │   │   └── seedScript.ts         # Faker-based load test seeder
+│   │   ├── schema/
+│   │   │   ├── authInput.schema.ts   # Auth input validation
+│   │   │   └── link.schema.ts        # URL validation + SSRF protection
+│   │   ├── types/
 │   │   │   ├── auth.types.ts
 │   │   │   ├── link.types.ts
-│   │   │   └── express.d.ts       # Express extensions
+│   │   │   └── express.d.ts          # Express type extensions
 │   │   ├── errors/
-│   │   │   └── AppError.ts        # Custom error class
+│   │   │   └── AppError.ts           # Custom error hierarchy
 │   │   └── utils/
-│   │       └── catchAsync.ts      # Async error wrapper
+│   │       └── catchAsync.ts         # Async error wrapper
 │   ├── prisma/
-│   │   ├── schema.prisma          # Prisma schema definition
-│   │   └── migrations/            # Database migrations
-│   ├── generated/
-│   │   └── prisma/                # Auto-generated Prisma types
+│   │   ├── schema.prisma
+│   │   └── migrations/
+│   ├── generated/prisma/             # Auto-generated Prisma client
 │   ├── Dockerfile
-│   ├── entrypoint.sh              # Container startup script
+│   ├── entrypoint.sh
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── prisma.config.ts
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx                   # Root component & view routing
+│   │   ├── main.tsx                  # Entry point (React + QueryClient)
+│   │   ├── index.css                 # Global styles
+│   │   ├── components/
+│   │   │   ├── LandingPage.tsx       # Marketing landing page
+│   │   │   ├── AuthPage.tsx          # Login / Register forms
+│   │   │   ├── Dashboard.tsx         # Link management dashboard
+│   │   │   ├── AnalyticsPage.tsx     # Per-link click analytics
+│   │   │   └── GlobeVisualizer.tsx   # Geographic click visualization
+│   │   ├── hooks/
+│   │   │   ├── useAuth.ts           # Login, register, logout mutations
+│   │   │   ├── useLinks.ts          # Link CRUD queries & mutations
+│   │   │   └── useAnalytics.ts      # Click analytics query
+│   │   ├── lib/
+│   │   │   ├── api.ts               # Axios instance + auth interceptors
+│   │   │   └── queryClient.ts       # TanStack Query client config
+│   │   └── types/
+│   │       └── api.ts               # API request/response types
+│   ├── index.html
+│   ├── vite.config.ts                # Vite + Tailwind + API proxy
+│   ├── tsconfig.json
+│   └── package.json
 ├── nginx/
-│   └── nginx.conf                 # Nginx reverse proxy & load balancer config
-├── certs/                         # SSL/TLS certificates
-├── docker-compose.yaml            # Multi-container orchestration (3 backend instances + load balancing)
-└── README.md                       # This file
+│   └── nginx.conf                    # least_conn LB + SSL termination
+├── certs/                            # Self-signed SSL certificates
+├── .github/
+│   └── workflows/
+│       └── ci.yml                    # CI build + Docker Hub publish
+├── docker-compose.yaml
+├── security_review.md                # Security audit findings
+└── README.md
 ```
 
-## Development Workflow
+## Architecture
 
-### Running in Development Mode
+### Click Recording Pipeline
 
-```bash
-cd backend
-npm run dev
+Clicks are not written directly to PostgreSQL on each redirect. Instead, they use a **buffered write-behind** pattern for high throughput:
+
+```
+Redirect Request
+       ↓
+  Record click → Redis RPUSH "click-buffer"
+  Increment counter → Redis HINCRBY "meta:{shortCode}" clicks
+       ↓
+  [Background Worker: clickFlusher]
+  Every 5s → LPOP up to 1000 items → Prisma createMany → PostgreSQL
 ```
 
-This uses `ts-node-dev` to:
-- Auto-reload on file changes
-- Transpile TypeScript on-the-fly
-- Maintain fast development experience
-
-### Building for Production
-
-```bash
-cd backend
-npm run build
-```
-
-Compiles TypeScript to JavaScript in the `dist/` directory.
-
-### Starting Production Server
-
-```bash
-cd backend
-npm start
-```
-
-Runs the compiled JavaScript from `dist/src/server.js`.
-
-### Database Management
-
-**Run Migrations**:
-```bash
-npx prisma migrate dev --name your_migration_name
-```
-
-**View Database UI**:
-```bash
-npx prisma studio
-```
-
-**Reset Database** (⚠️ Development only):
-```bash
-npx prisma migrate reset
-```
-
-**Generate Prisma Client**:
-```bash
-npx prisma generate
-```
-
-## Docker Compose Services
-
-### urlshortener-db
-- **Image**: postgres:15
-- **Port**: 5433 (maps to 5432 inside container)
-- **Credentials**: 
-  - User: `username123`
-  - Password: `password123`
-- **Database**: `url_shortener`
-- **Volume**: `urlShortener-data` (persists between restarts)
-- **Restart Policy**: unless-stopped
-
-### redis
-- **Image**: redis:latest
-- **Port**: 6379
-- **Purpose**: Caching layer for session and data storage
-- **Volume**: `redis-data` (persists between restarts)
-- **Features**: AOF (Append-Only File) persistence enabled
-- **Restart Policy**: unless-stopped
-
-### nginx
-- **Image**: nginx:alpine
-- **Ports**: 80 (HTTP), 443 (HTTPS)
-- **Purpose**: Reverse proxy and load balancer
-- **Configuration**: [nginx/nginx.conf](nginx/nginx.conf)
-- **SSL/TLS Certificates**: Located in `./certs/` directory
-- **Routes To**: All 3 backend instances with load balancing
-
-### adminer
-- **Image**: adminer:latest
-- **Port**: 8081
-- **Purpose**: Web-based database management UI
-- **Access**: `http://localhost:8081`
-- **Restart Policy**: unless-stopped
-
-### url-shortener-backend (Instance 1)
-- **Build**: `./backend/Dockerfile`
-- **Port**: 3004 (external) → 3000 (internal)
-- **Environment**: 
-  - `REDIS_URL`: redis://redis:6379
-  - `APP_NAME`: app1
-- **Dependencies**: Database, Redis
-- **Restart Policy**: unless-stopped
-
-### url-shortener-backend2 (Instance 2)
-- **Build**: `./backend/Dockerfile`
-- **Port**: 3002 (external) → 3000 (internal)
-- **Environment**: 
-  - `REDIS_URL`: redis://redis:6379
-  - `APP_NAME`: app2
-- **Dependencies**: Database, Redis, Nginx
-- **Restart Policy**: unless-stopped
-
-### url-shortener-backend3 (Instance 3)
-- **Build**: `./backend/Dockerfile`
-- **Port**: 3003 (external) → 3000 (internal)
-- **Environment**: 
-  - `REDIS_URL`: redis://redis:6379
-  - `APP_NAME`: app3
-- **Dependencies**: Database, Redis, Nginx
-- **Restart Policy**: unless-stopped
-
-**Load Balancing**: Nginx distributes incoming requests across all 3 backend instances for high availability and scalability.
-
-## Error Handling
-
-The API uses a centralized error handler that returns consistent error responses:
-
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Error description",
-    "statusCode": 400
-  }
-}
-```
-
-Custom error types are defined in [AppError.ts](backend/src/errors/AppError.ts).
-
-## CORS Configuration
-
-The backend is configured to accept requests with:
-- **Methods**: GET, POST, PUT, DELETE
-- **Headers**: Content-Type, Authorization
-- **Credentials**: Enabled
-
-When using Docker with Nginx:
-- Requests are routed through Nginx on ports 80 (HTTP) and 443 (HTTPS)
-- Update the CORS origin in [server.ts](backend/src/server.ts) to match your frontend domain
-- For local development, Nginx is configured to proxy requests to all 3 backend instances
-
-## Load Balancing Architecture
-
-The application uses a **3-tier load-balanced deployment**:
+### Load Balancing
 
 ```
 Client Requests
        ↓
-   [Nginx] (Reverse Proxy & Load Balancer)
-   ↙    ↓    ↘
+   [Nginx] (SSL Termination + Reverse Proxy)
+   ↙    ↓    ↘         ← least_conn algorithm
 Backend1  Backend2  Backend3
    ↖    ↓    ↙
-   [PostgreSQL DB] ← Shared Database
-   [Redis] ← Shared Cache
+   [PostgreSQL] ← Shared Database
+   [Redis]      ← Shared Cache + Click Buffer + Rate Limit Store
 ```
 
-**Benefits**:
-- **High Availability**: If one backend fails, traffic routes to others
-- **Scalability**: Add more backend instances easily
-- **Performance**: Requests distributed across multiple instances
-- **Caching**: Redis shared cache for all instances
-- **Session Consistency**: Database-backed sessions work across instances
+- **Algorithm**: `least_conn` (routes to the backend with fewest active connections)
+- **Failure Handling**: `max_fails=3 fail_timeout=30s` per upstream
+- **SSL**: Terminated at Nginx with self-signed certificates
 
-**Nginx Configuration**:
-- Load balancing algorithm: Round-robin (default)
-- Health checks: Can be configured in [nginx/nginx.conf](nginx/nginx.conf)
-- SSL/TLS termination: Handled by Nginx
+### Authentication Flow
 
-## Input Validation
+```
+Login/Register → Server returns:
+  - Access token (15min) → stored in JS memory (not localStorage)
+  - Refresh token (7 days) → httpOnly secure cookie
 
-All API inputs are validated using Zod schemas:
-- **Auth Schemas**: Email format, password strength
-- **Link Schemas**: URL format validation
+On 401 → Axios interceptor auto-refreshes once:
+  - POST /api/auth/refresh (sends cookie)
+  - Server rotates refresh token (old one deleted, new one issued)
+  - Retries original request with new access token
+```
 
-Validation schemas are located in [backend/src/schema/](backend/src/schema/)
+### Rate Limiting Strategy
 
-## Caching with Redis
+All rate limiters use Redis as a shared store (works across all 3 backend replicas):
 
-Redis is integrated for:
-- **Session Management**: Store session tokens and user data
-- **Rate Limiting**: Prevent abuse by tracking request counts
-- **Data Caching**: Cache frequently accessed links and analytics
-- **Distributed Cache**: Shared across all 3 backend instances
+| Limiter | Window | Max | Key | Scope |
+|---------|--------|-----|-----|-------|
+| `authLimiter` | 15 min | 10 | IP | Login & Register |
+| `refreshLimiter` | 15 min | 20 | IP | Token refresh |
+| `createLinkLimiter` | 1 hr | 30 | User ID (or IP) | Link creation |
+| `redirectIpLimiter` | 1 min | 60 | IP | Redirect endpoint |
+| `redirectCodeLimiter` | 1 min | 200 | Short code | Per-link abuse prevention |
 
-**Configuration**: Set `REDIS_URL` environment variable (auto-configured in Docker)
+### Redis Caching Strategy
 
-**Access**:
-- Local development: `redis://localhost:6379`
-- Docker: `redis://redis:6379`
+| Key Pattern | Data | TTL | Purpose |
+|-------------|------|-----|---------|
+| `link:{shortCode}` | Serialized link object | 1 hour | Redirect lookup cache |
+| `meta:{shortCode}` | Hash: `originalUrl`, `userId`, `clicks`, `createdAt` | Persistent | Click counter + metadata |
+| `click-buffer` | List of JSON click objects | Flushed every 5s | Buffered click writes |
+| `rate-limit:*` | Rate limit counters | Per window | Redis-backed rate limiting |
+
+## Development Workflow
+
+### Running in Development
+
+**Backend:**
+```bash
+cd backend
+npm run dev   # ts-node-dev with auto-reload
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm run dev   # Vite dev server with HMR, API proxy to backend
+```
+
+### Available Scripts
+
+#### Backend (`backend/package.json`)
+| Script | Command | Description |
+|--------|---------|-------------|
+| `dev` | `ts-node-dev --respawn --transpile-only src/server.ts` | Development server |
+| `build` | `tsc` | Compile TypeScript to `dist/` |
+| `start` | `node dist/src/server.js` | Production server |
+| `db:generate` | `prisma generate` | Generate Prisma Client |
+| `db:migrate` | `prisma migrate dev` | Run database migrations |
+| `db:studio` | `prisma studio` | Open Prisma Studio UI |
+
+#### Frontend (`frontend/package.json`)
+| Script | Command | Description |
+|--------|---------|-------------|
+| `dev` | `vite --port=3000 --host=0.0.0.0` | Development server |
+| `build` | `vite build` | Production build |
+| `preview` | `vite preview` | Preview production build |
+| `lint` | `tsc --noEmit` | Type checking |
+
+### Database Management
+
+```bash
+# Run migrations
+npx prisma migrate dev --name your_migration_name
+
+# View database UI
+npx prisma studio
+
+# Reset database (⚠️ development only)
+npx prisma migrate reset
+
+# Generate Prisma Client
+npx prisma generate
+```
+
+### Load Test Seeding
+
+Seed the database with fake data for load testing:
+```bash
+cd backend
+npx tsx src/scripts/seedScript.ts
+```
+This creates **1,000 users** and **1,000,000 links** using Faker.js.
+
+## CI/CD Pipeline
+
+The project uses GitHub Actions (`.github/workflows/ci.yml`) with two jobs:
+
+### 1. CI Job (on push & PRs to `main`)
+- Spins up a PostgreSQL 15 service container
+- Installs dependencies (`npm ci`)
+- Generates Prisma client
+- Builds the TypeScript backend
+
+### 2. Docker Job (on push to `main` only)
+- Depends on CI job passing
+- Logs in to Docker Hub
+- Builds and pushes the backend image:
+  - `reyschwartz19/url-shortener-backend:latest`
+  - `reyschwartz19/url-shortener-backend:<commit-sha>`
 
 ## Security Features
 
-- ✅ **JWT Authentication**: Access and refresh token flow
-- ✅ **Password Hashing**: bcrypt with salt rounds
-- ✅ **CORS Protection**: Whitelist-based origin validation
-- ✅ **Input Validation**: Zod schema validation
-- ✅ **Error Handling**: No sensitive info leakage
-- ✅ **Session Management**: Token expiration and refresh
-- ✅ **IP Hashing**: Click data stored with hashed IPs
-
-## TODO / Future Enhancements
-
-- [ ] Add comprehensive test suite (Jest/Mocha)
-- [ ] Implement advanced rate limiting with Redis
-- [ ] QR code generation for short links
-- [ ] Link expiration
-- [ ] Bulk operations API
-- [ ] Admin dashboard
-- [ ] Analytics visualizations
-- [ ] Email verification
-- [ ] Password reset flow
-- [ ] Monitoring and alerting (Prometheus, Grafana)
-- [ ] API documentation (Swagger/OpenAPI)
-
+- ✅ **JWT Authentication** — Access (15min) + refresh (7 days) token flow
+- ✅ **Token Rotation** — Refresh tokens are single-use and rotated on each refresh
+- ✅ **httpOnly Cookies** — Refresh tokens stored in httpOnly cookies, access tokens in memory only
+- ✅ **Password Hashing** — bcrypt with salt rounds
+- ✅ **CORS Protection** — Whitelist-based origin validation with credentials
+- ✅ **SSRF Protection** — URL validation blocks localhost, private IPs, and internal networks
+- ✅ **Redis-Backed Rate Limiting** — Tiered limiters shared across all backend replicas
+- ✅ **Input Validation** — Zod schema validation for all API inputs
+- ✅ **IP Hashing** — Click data stored with SHA-256 hashed IPs
+- ✅ **Error Sanitization** — Custom error handler prevents sensitive info leakage
+- ✅ **Graceful Shutdown** — SIGTERM/SIGINT handlers flush buffered clicks before exit
 
 ## Troubleshooting
 
@@ -544,7 +543,7 @@ Redis is integrated for:
 - Verify `DATABASE_URL` is correct
 - Check PostgreSQL is running: `docker-compose ps`
 - Check port 5433 is not in use
-- Ensure Adminer can connect at `http://localhost:8081`
+- Access Adminer at `http://localhost:8081`
 
 ### Redis Connection Issues
 - Verify Redis is running: `docker-compose ps`
@@ -557,32 +556,53 @@ Redis is integrated for:
 # Reset migrations (development only)
 npx prisma migrate reset
 
-# Or manually run migrations
+# Or manually deploy migrations
 npx prisma migrate deploy
 ```
 
-### Port Already in Use
-- Backend instances use ports 3002, 3003, 3004 (external mapping to 3000 internal)
-- Nginx uses ports 80 and 443
-- Redis uses port 6379
-- PostgreSQL uses port 5433
-- Adminer uses port 8081
+### Port Conflicts
+| Service | Port |
+|---------|------|
+| Backend Instance 1 | 3004 |
+| Backend Instance 2 | 3002 |
+| Backend Instance 3 | 3003 |
+| Nginx (HTTP) | 80 |
+| Nginx (HTTPS) | 443 |
+| PostgreSQL | 5433 |
+| Redis | 6379 |
+| Adminer | 8081 |
+| Frontend Dev Server | 3000 |
 
-Change ports in `docker-compose.yaml` or kill the process using the port.
-
-### Load Balancer Issues (Nginx)
+### Load Balancer Issues
 - Verify Nginx is running: `docker-compose ps`
 - Check Nginx logs: `docker-compose logs nginx`
-- Verify backend instances are healthy: `docker-compose logs url-shortener-backend`
-- Check Nginx configuration: `docker exec -it nginx nginx -t`
+- Test config: `docker exec -it nginx nginx -t`
+- Check upstream health: `docker-compose logs url-shortener-backend`
 
 ### Container Won't Start
-Check logs: `docker-compose logs url-shortener-backend`
+```bash
+docker-compose logs url-shortener-backend
+```
 
 ### One Backend Instance Fails
-- The load balancer will route traffic to the remaining healthy instances
+- The `least_conn` balancer will route traffic to remaining healthy instances
 - Check specific instance: `docker-compose logs url-shortener-backend2`
 - Restart a specific service: `docker-compose up -d url-shortener-backend2`
+
+## TODO / Future Enhancements
+
+- [ ] Add comprehensive test suite (Jest/Vitest)
+- [ ] QR code generation for short links
+- [ ] Link expiration / TTL
+- [ ] Custom short codes
+- [ ] Bulk operations API
+- [ ] Email verification
+- [ ] Password reset flow
+- [ ] Monitoring & alerting (Prometheus, Grafana)
+- [ ] API documentation (Swagger/OpenAPI)
+- [ ] Browser & device analytics (User-Agent parsing)
+- [ ] Link click heatmaps
+- [ ] Team / organization support
 
 ## License
 
