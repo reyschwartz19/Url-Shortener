@@ -48,7 +48,10 @@ export const refreshLimiter = createLimiter({
     message: 'Too many requests from this IP, please try again after 15 minutes.',
 })
 
-export const createLinkLimiter = createLimiter({
+export const createLinkLimiter = isLoadTest
+  ? (req: Request, res: Response, next: NextFunction) => next()
+  :
+ createLimiter({
     windowMs: 60 * 60 * 1000,
     max: 30,
     keyPrefix: 'create-link',
