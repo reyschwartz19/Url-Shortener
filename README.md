@@ -322,7 +322,8 @@ urlShortener/
 │   │   ├── workers/
 │   │   │   └── clickFlusher.ts       # Background click buffer → DB writer
 │   │   ├── scripts/
-│   │   │   └── seedScript.ts         # Faker-based load test seeder
+│   │   │   ├── seedScript.ts         # Faker-based load test seeder
+│   │   │   └── loadTestCreateLink.ts # Autocannon load test for link creation
 │   │   ├── schema/
 │   │   │   ├── authInput.schema.ts   # Auth input validation
 │   │   │   └── link.schema.ts        # URL validation + SSRF protection
@@ -473,6 +474,12 @@ npm run dev   # Vite dev server with HMR, API proxy to backend
 | `db:migrate` | `prisma migrate dev` | Run database migrations |
 | `db:studio` | `prisma studio` | Open Prisma Studio UI |
 
+#### Standalone Scripts
+| Script | Command | Description |
+|--------|---------|-------------|
+| Seed Database | `npx tsx src/scripts/seedScript.ts` | Seed 1,000 users & 1M links with Faker |
+| Load Test (Autocannon) | `TOKEN=<jwt> npx tsx src/scripts/loadTestCreateLink.ts` | Stress-test link creation endpoint |
+
 #### Frontend (`frontend/package.json`)
 | Script | Command | Description |
 |--------|---------|-------------|
@@ -505,6 +512,47 @@ cd backend
 npx tsx src/scripts/seedScript.ts
 ```
 This creates **1,000 users** and **1,000,000 links** using Faker.js.
+
+### Load Testing with Autocannon
+
+The project includes a load test script (`src/scripts/loadTestCreateLink.ts`) built on [autocannon](https://github.com/mcollina/autocannon) that stress-tests the `POST /api/links/createLink` endpoint.
+
+#### What It Does
+
+- Opens **x concurrent connections** against `https://localhost/api/links/createLink`
+- Runs for **x seconds**
+- Each request creates a short link with a unique random URL
+- Prints latency percentiles, requests/sec, status-code distribution, and error/timeout counts
+
+#### Prerequisites
+
+1. The full Docker stack must be running (`docker-compose up -d`) so Nginx, all backend replicas, PostgreSQL, and Redis are available.
+2. Set the `LOAD_TEST` environment variable to `"true"` on the backend containers to bypass redirect rate limiters during the test.
+3. Obtain a valid JWT access token (login via the API or frontend and copy the token).
+
+#### Running the Load Test
+
+```bash
+cd backend
+TOKEN=<your-access-token> npx tsx src/scripts/loadTestCreateLink.ts
+```
+
+> **Example:**
+> ```bash
+> TOKEN=eyJhbGciOiJIUzI1NiIs... npx tsx src/scripts/loadTestCreateLink.ts
+> ```
+
+#### Interpreting the Output
+
+The script prints:
+
+| Metric | Description |
+|--------|-------------|
+| `Status codes` | Breakdown of HTTP status codes returned (look for `200`/`201`) |
+| `Errors` | Number of connection errors |
+| `Timeouts` | Number of requests that exceeded the timeout |
+| `Req/sec avg` | Average requests per second over the test duration |
+| Latency table | p50, p90, p99 latencies and full results table |
 
 ## CI/CD Pipeline
 

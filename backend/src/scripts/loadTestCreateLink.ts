@@ -18,8 +18,8 @@ async function main(): Promise<void> {
   const result: Result = await autocannon({
     url: "https://localhost/api/links/createLink",
     method: "POST",
-    connections: 10,
-    duration: 10,
+    connections: 1000,
+    duration: 30,
     headers: {
       Authorization: `Bearer ${TOKEN}`,
       "Content-Type": "application/json",
